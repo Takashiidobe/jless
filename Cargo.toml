@@ -1,6 +1,6 @@
 [package]
 name = "jless"
-version = "0.7.1"
+version = "0.7.2"
 authors = ["Paul Julius Martinez <pauljuliusmartinez@gmail.com>"]
 license = "MIT"
 description = "A command-line JSON viewer"
@@ -10,6 +10,7 @@ repository = "https://github.com/PaulJuliusMartinez/jless"
 homepage = "https://github.com/PaulJuliusMartinez/jless"
 documentation = "https://github.com/PaulJuliusMartinez/jless/blob/master/src/jless.help"
 edition = "2018"
+rust-version = "1.54"
 
 [dependencies]
 logos = "0.12.0"
@@ -21,5 +22,10 @@ lazy_static = "1.4.0"
 termion = "1.5.6"
 signal-hook = "0.3.8"
 libc = "0.2"
-structopt = "0.3"
+clap = { version = "3.0", features = ["derive"] }
 isatty = "0.1"
+libc-stdhandle = "0.1.0"
+yaml-rust = "0.4"
+
+[dev-dependencies]
+indoc = "1.0"

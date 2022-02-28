@@ -10,7 +10,7 @@ use termion::screen::{ToAlternateScreen, ToMainScreen};
 use crate::flatjson;
 use crate::input::TuiEvent;
 use crate::input::TuiEvent::{KeyEvent, MouseEvent, WinChEvent};
-use crate::options::Opt;
+use crate::options::{DataFormat, Opt};
 use crate::screenwriter::{MessageSeverity, ScreenWriter};
 use crate::search::{JumpDirection, SearchDirection, SearchState};
 use crate::types::TTYDimensions;
@@ -40,11 +40,12 @@ const BELL: &str = "\x07";
 impl App {
     pub fn new(
         opt: &Opt,
-        json: String,
+        data: String,
+        data_format: DataFormat,
         input_filename: String,
         stdout: Box<dyn Write>,
     ) -> Result<App, String> {
-        let flatjson = match flatjson::parse_top_level_json(json) {
+        let flatjson = match Self::parse_input(data, data_format) {
             Ok(flatjson) => flatjson,
             Err(err) => return Err(format!("Unable to parse input: {:?}", err)),
         };
@@ -63,6 +64,13 @@ impl App {
             search_state: SearchState::empty(),
             message: None,
         })
+    }
+
+    fn parse_input(data: String, data_format: DataFormat) -> Result<flatjson::FlatJson, String> {
+        match data_format {
+            DataFormat::Json => flatjson::parse_top_level_json(data),
+            DataFormat::Yaml => flatjson::parse_top_level_yaml(data),
+        }
     }
 
     pub fn run(&mut self, input: Box<dyn Iterator<Item = io::Result<TuiEvent>>>) {
@@ -122,11 +130,7 @@ impl App {
                             let lines = self.parse_input_buffer_as_number();
                             Some(Action::MoveUp(lines))
                         }
-                        Key::Down
-                        | Key::Char('j')
-                        | Key::Char(' ')
-                        | Key::Ctrl('n')
-                        | Key::Char('\n') => {
+                        Key::Down | Key::Char('j') | Key::Ctrl('n') | Key::Char('\n') => {
                             let lines = self.parse_input_buffer_as_number();
                             Some(Action::MoveDown(lines))
                         }
@@ -137,6 +141,14 @@ impl App {
                         Key::Ctrl('y') => {
                             let lines = self.parse_input_buffer_as_number();
                             Some(Action::ScrollUp(lines))
+                        }
+                        Key::Ctrl('d') => {
+                            let maybe_distance = self.maybe_parse_input_buffer_as_number();
+                            Some(Action::JumpDown(maybe_distance))
+                        }
+                        Key::Ctrl('u') => {
+                            let maybe_distance = self.maybe_parse_input_buffer_as_number();
+                            Some(Action::JumpUp(maybe_distance))
                         }
                         Key::PageUp => {
                             let count = self.parse_input_buffer_as_number();
@@ -226,7 +238,7 @@ impl App {
                         Key::Char('H') => Some(Action::FocusParent),
                         Key::Char('c') => Some(Action::CollapseNodeAndSiblings),
                         Key::Char('e') => Some(Action::ExpandNodeAndSiblings),
-                        Key::Char('i') => Some(Action::ToggleCollapsed),
+                        Key::Char(' ') => Some(Action::ToggleCollapsed),
                         Key::Char('^') => Some(Action::FocusFirstSibling),
                         Key::Char('$') => Some(Action::FocusLastSibling),
                         Key::Char('g') | Key::Home => Some(Action::FocusTop),
@@ -353,10 +365,14 @@ impl App {
         }
     }
 
-    fn parse_input_buffer_as_number(&mut self) -> usize {
+    fn maybe_parse_input_buffer_as_number(&mut self) -> Option<usize> {
         let n = str::parse::<usize>(std::str::from_utf8(&self.input_buffer).unwrap());
         self.input_buffer.clear();
-        n.unwrap_or(1)
+        n.ok()
+    }
+
+    fn parse_input_buffer_as_number(&mut self) -> usize {
+        self.maybe_parse_input_buffer_as_number().unwrap_or(1)
     }
 
     fn get_search_input_and_start_search(
